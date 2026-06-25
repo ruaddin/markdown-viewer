@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Markdown Table Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Mono&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f5f5;
+      --surface: #ffffff;
+      --surface2: #f0f0f0;
+      --border: #d8d8d8;
+      --border-focus: #5c6bc0;
+      --text: #1a1a1a;
+      --text-muted: #666;
+      --accent: #5c6bc0;
+      --accent-hover: #3f51b5;
+      --danger: #d32f2f;
+      --success: #388e3c;
+      --radius: 6px;
+      --transition: 0.15s ease;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px 24px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      margin-bottom: 28px;
+    }
+
+    section { margin-bottom: 24px; }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    input[type="number"], input[type="text"], textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 7px 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    input[type="number"]:focus, input[type="text"]:focus, textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(92, 107, 192, 0.18);
+    }
+
+    input[type="number"] { width: 90px; }
+
+    /* ── Import panel ─────────────────────────────────────────────────────── */
+    #import-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+    }
+
+    #import-toggle {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 10px 14px;
+      text-align: left;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color var(--transition);
+    }
+
+    #import-toggle:hover { color: var(--accent); }
+
+    #import-toggle .arrow {
+      display: inline-block;
+      transition: transform 0.18s ease;
+      font-size: 10px;
+    }
+
+    #import-toggle.open .arrow { transform: rotate(90deg); }
+
+    #import-body {
+      display: none;
+      padding: 0 14px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    #import-body.open { display: block; }
+
+    #import-textarea {
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      font-family: 'Space Mono', monospace;
+      font-size: 12.5px;
+      margin-top: 12px;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    #import-error {
+      font-size: 12px;
+      color: var(--danger);
+      margin-bottom: 8px;
+      min-height: 16px;
+    }
+
+    .import-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── Column count row ─────────────────────────────────────────────────── */
+    .col-count-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ── Header inputs ────────────────────────────────────────────────────── */
+    #header-inputs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      align-items: flex-start;
+    }
+
+    .header-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 80px;
+    }
+
+    .header-col input { width: 100%; }
+
+    .col-delete-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: var(--radius);
+      font-size: 11px;
+      padding: 2px 6px;
+      align-self: center;
+      transition: color var(--transition), border-color var(--transition), background var(--transition);
+    }
+
+    .col-delete-btn:hover:not(:disabled) {
+      color: var(--danger);
+      border-color: var(--danger);
+      background: rgba(211, 47, 47, 0.07);
+    }
+
+    .col-delete-btn:disabled { opacity: 0.2; cursor: default; }
+
+    /* ── Table editor ─────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+
+    #editor-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 300px;
+    }
+
+    #editor-table td, #editor-table th {
+      padding: 4px;
+      vertical-align: middle;
+    }
+
+    #editor-table td.delete-cell {
+      width: 32px;
+      padding: 4px 0 4px 4px;
+    }
+
+    #editor-table td textarea {
+      width: 100%;
+      min-width: 80px;
+      min-height: calc(1.5em + 14px);
+      max-height: calc(4.5em + 14px);
+      height: calc(1.5em + 14px);
+      resize: none;
+      overflow-y: auto;
+      line-height: 1.5;
+      display: block;
+    }
+
+    /* Auto-number column */
+    .num-cell {
+      width: 36px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: 'Space Mono', monospace;
+      user-select: none;
+      padding: 4px 6px !important;
+    }
+
+    .num-header {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: center;
+      padding: 4px 6px;
+      font-family: 'Space Mono', monospace;
+      user-select: none;
+    }
+
+    .row-delete-btn {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: var(--radius);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      transition: color var(--transition), border-color var(--transition), background var(--transition);
+    }
+
+    .row-delete-btn:hover:not(:disabled) {
+      color: var(--danger);
+      border-color: var(--danger);
+      background: rgba(211, 47, 47, 0.07);
+    }
+
+    .row-delete-btn:disabled { opacity: 0.2; cursor: default; }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    tr.new-row { animation: rowIn 0.18s ease forwards; }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
+    button {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: var(--radius);
+      padding: 7px 14px;
+      transition: background var(--transition), color var(--transition), transform 0.1s ease;
+      border: none;
+      outline: none;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent-hover);
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-accent:hover { background: var(--accent-hover); }
+
+    #add-row-btn { margin-top: 10px; }
+
+    #copy-btn.copied { background: var(--success); }
+
+    /* ── Preview ──────────────────────────────────────────────────────────── */
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    #rendered-preview {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+
+    #rendered-preview table { border-collapse: collapse; font-size: 13px; }
+
+    #rendered-preview th,
+    #rendered-preview td {
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    #rendered-preview th { background: var(--surface2); font-weight: 600; }
+    #rendered-preview td { color: var(--text-muted); }
+
+    #raw-preview {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12.5px;
+      color: #2e7d32;
+      white-space: pre;
+      overflow-x: auto;
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 8px 0 20px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Markdown Table Editor</h1>
+
+<!-- Import Markdown -->
+<div id="import-section">
+  <button id="import-toggle" aria-expanded="false">
+    <span class="arrow">▶</span> Import Markdown
+  </button>
+  <div id="import-body">
+    <textarea id="import-textarea" placeholder="Paste a GFM markdown table here, then click Load Table…"></textarea>
+    <div id="import-error"></div>
+    <div class="import-actions">
+      <button class="btn-accent" id="load-btn">Load Table</button>
+      <button class="btn-secondary" id="clear-import-btn">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Column Count -->
+<section>
+  <label>Number of columns</label>
+  <div class="col-count-row">
+    <input type="number" id="col-count" min="1" max="12" value="3" />
+  </div>
+</section>
+
+<!-- Column Headers -->
+<section>
+  <label>Column headers</label>
+  <div id="header-inputs"></div>
+</section>
+
+<!-- Table Editor -->
+<section>
+  <label>Table data</label>
+  <div class="table-wrap">
+    <table id="editor-table">
+      <thead><tr id="table-header-row"></tr></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+  <button id="add-row-btn" class="btn-secondary">+ Add Row</button>
+</section>
+
+<hr class="divider" />
+
+<!-- Preview -->
+<section>
+  <div class="preview-header">
+    <label style="margin-bottom:0">Preview</label>
+    <button id="copy-btn" class="btn-accent">Copy Markdown</button>
+  </div>
+  <div id="rendered-preview"></div>
+  <div id="raw-preview"></div>
+</section>
+
+<script>
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const colCountInput   = document.getElementById('col-count');
+  const headerInputsDiv = document.getElementById('header-inputs');
+  const tableHeaderRow  = document.getElementById('table-header-row');
+  const tableBody       = document.getElementById('table-body');
+  const addRowBtn       = document.getElementById('add-row-btn');
+  const copyBtn         = document.getElementById('copy-btn');
+  const renderedPrev    = document.getElementById('rendered-preview');
+  const rawPrev         = document.getElementById('raw-preview');
+  const importToggle    = document.getElementById('import-toggle');
+  const importBody      = document.getElementById('import-body');
+  const importTextarea  = document.getElementById('import-textarea');
+  const importError     = document.getElementById('import-error');
+  const loadBtn         = document.getElementById('load-btn');
+  const clearImportBtn  = document.getElementById('clear-import-btn');
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let colCount = 3;
+  let headers  = ['Name', 'Value', 'Notes'];
+  let rows     = [['', '', '']];
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function getMarkdown() {
+    const allHeaders = ['#', ...headers];
+    const headerLine = '| ' + allHeaders.map(h => h || ' ').join(' | ') + ' |';
+    const sepLine    = '| ' + allHeaders.map(() => '---').join(' | ') + ' |';
+    const dataLines  = rows.map((row, i) =>
+      '| ' + [String(i + 1), ...row.map(c => c || ' ')].join(' | ') + ' |'
+    );
+    return [headerLine, sepLine, ...dataLines].join('\n');
+  }
+
+  // ── Render: table header row ───────────────────────────────────────────────
+  function renderTableHeader() {
+    tableHeaderRow.innerHTML = '';
+    // # column
+    const numTh = document.createElement('th');
+    numTh.className = 'num-header';
+    numTh.textContent = '#';
+    tableHeaderRow.appendChild(numTh);
+    // data columns (mirror header inputs)
+    for (let i = 0; i < colCount; i++) {
+      const th = document.createElement('th');
+      th.style.cssText = 'padding:4px; font-weight:600; font-size:13px; color:var(--text-muted); text-align:left;';
+      th.textContent = headers[i] || `Col ${i + 1}`;
+      tableHeaderRow.appendChild(th);
+    }
+    // spacer for delete column
+    const spaceTh = document.createElement('th');
+    spaceTh.style.width = '32px';
+    tableHeaderRow.appendChild(spaceTh);
+  }
+
+  // ── Render: column header inputs ───────────────────────────────────────────
+  function renderHeaderInputs() {
+    const existing = Array.from(headerInputsDiv.querySelectorAll('.header-col'));
+
+    while (existing.length < colCount) {
+      const col = document.createElement('div');
+      col.className = 'header-col';
+
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.placeholder = `Col ${existing.length + 1}`;
+      inp.value = headers[existing.length] || '';
+      inp.addEventListener('input', e => {
+        const i = Array.from(headerInputsDiv.querySelectorAll('.header-col')).indexOf(col);
+        headers[i] = e.target.value;
+        renderTableHeader();
+        updatePreview();
+      });
+
+      const btn = document.createElement('button');
+      btn.className = 'col-delete-btn';
+      btn.title = 'Delete column';
+      btn.textContent = '✕';
+      btn.addEventListener('click', () => {
+        const i = Array.from(headerInputsDiv.querySelectorAll('.header-col')).indexOf(col);
+        deleteColumn(i);
+      });
+
+      col.appendChild(inp);
+      col.appendChild(btn);
+      headerInputsDiv.appendChild(col);
+      existing.push(col);
+    }
+
+    while (existing.length > colCount) existing.pop().remove();
+
+    existing.forEach((col, i) => {
+      const inp = col.querySelector('input');
+      const btn = col.querySelector('button');
+      if (document.activeElement !== inp) inp.value = headers[i] || '';
+      btn.disabled = colCount <= 1;
+    });
+  }
+
+  // ── Render: table body ─────────────────────────────────────────────────────
+  function renderTableBody(animateLastRow = false) {
+    rows.forEach((rowData, ri) => {
+      let tr = tableBody.querySelector(`tr[data-row="${ri}"]`);
+
+      if (!tr) {
+        tr = document.createElement('tr');
+        tr.dataset.row = ri;
+        if (animateLastRow && ri === rows.length - 1) tr.classList.add('new-row');
+        tableBody.appendChild(tr);
+      }
+
+      // Auto-number cell
+      let numTd = tr.querySelector('td.num-cell');
+      if (!numTd) {
+        numTd = document.createElement('td');
+        numTd.className = 'num-cell';
+        tr.prepend(numTd);
+      }
+      numTd.textContent = ri + 1;
+
+      // Data cells
+      const cells = Array.from(tr.querySelectorAll('td.data-cell'));
+
+      while (cells.length < colCount) {
+        const td = document.createElement('td');
+        td.className = 'data-cell';
+        const ta = document.createElement('textarea');
+        ta.rows = 1;
+        ta.value = rowData[cells.length] || '';
+        ta.addEventListener('input', e => {
+          const r = +tr.dataset.row;
+          const c = Array.from(tr.querySelectorAll('td.data-cell textarea')).indexOf(e.target);
+          rows[r][c] = e.target.value;
+          autoGrow(e.target);
+          updatePreview();
+        });
+        td.appendChild(ta);
+        const delCell = tr.querySelector('td.delete-cell');
+        if (delCell) tr.insertBefore(td, delCell);
+        else tr.appendChild(td);
+        cells.push(td);
+      }
+
+      while (cells.length > colCount) cells.pop().remove();
+
+      // Delete button cell
+      if (!tr.querySelector('td.delete-cell')) {
+        const delTd = document.createElement('td');
+        delTd.className = 'delete-cell';
+        const btn = document.createElement('button');
+        btn.className = 'row-delete-btn';
+        btn.title = 'Delete row';
+        btn.textContent = '✕';
+        btn.addEventListener('click', () => deleteRow(+tr.dataset.row));
+        delTd.appendChild(btn);
+        tr.appendChild(delTd);
+      }
+
+      // Sync existing cell values (skip focused), re-measure height
+      Array.from(tr.querySelectorAll('td.data-cell textarea')).forEach((ta, ci) => {
+        if (document.activeElement !== ta) { ta.value = rowData[ci] || ''; autoGrow(ta); }
+      });
+    });
+
+    // Remove stale rows
+    Array.from(tableBody.querySelectorAll('tr')).forEach(tr => {
+      if (+tr.dataset.row >= rows.length) tr.remove();
+    });
+
+    // Re-index and refresh row numbers
+    Array.from(tableBody.querySelectorAll('tr')).forEach((tr, i) => {
+      tr.dataset.row = i;
+      const numTd = tr.querySelector('td.num-cell');
+      if (numTd) numTd.textContent = i + 1;
+    });
+
+    updateDeleteButtons();
+  }
+
+  function updateDeleteButtons() {
+    tableBody.querySelectorAll('.row-delete-btn').forEach(btn => {
+      btn.disabled = rows.length <= 1;
+    });
+  }
+
+  // ── Preview ────────────────────────────────────────────────────────────────
+  function updatePreview() {
+    rawPrev.textContent = getMarkdown();
+
+    const allHeaders = ['#', ...headers];
+    const hCells = allHeaders.map(h => `<th>${escHtml(h || '')}</th>`).join('');
+    const dRows = rows.map((row, i) => {
+      const cells = [String(i + 1), ...row].map(c => `<td>${escHtml(c || '')}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    renderedPrev.innerHTML = `<table><thead><tr>${hCells}</tr></thead><tbody>${dRows}</tbody></table>`;
+  }
+
+  // ── Auto-grow textarea (max 3 lines) ───────────────────────────────────────
+  function autoGrow(ta) {
+    ta.style.height = 'auto';
+    const lineH   = parseFloat(getComputedStyle(ta).lineHeight) || 21;
+    const padV    = parseFloat(getComputedStyle(ta).paddingTop) + parseFloat(getComputedStyle(ta).paddingBottom);
+    const maxH    = lineH * 3 + padV;
+    ta.style.height = Math.min(ta.scrollHeight, maxH) + 'px';
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  function fullRender() {
+    renderTableHeader();
+    renderHeaderInputs();
+    renderTableBody();
+    updatePreview();
+  }
+
+  function setColCount(n) {
+    n = clamp(n, 1, 12);
+    colCount = n;
+    while (headers.length < colCount) headers.push('');
+    headers = headers.slice(0, colCount);
+    rows = rows.map(row => {
+      while (row.length < colCount) row.push('');
+      return row.slice(0, colCount);
+    });
+    fullRender();
+  }
+
+  function addRow() {
+    rows.push(new Array(colCount).fill(''));
+    renderTableBody(true);
+    updatePreview();
+    const lastTr = tableBody.querySelector(`tr[data-row="${rows.length - 1}"]`);
+    if (lastTr) { const ta = lastTr.querySelector('textarea'); if (ta) ta.focus(); }
+  }
+
+  function deleteColumn(ci) {
+    if (colCount <= 1) return;
+    headers.splice(ci, 1);
+    rows = rows.map(row => { row.splice(ci, 1); return row; });
+    colCount--;
+    colCountInput.value = colCount;
+    fullRender();
+  }
+
+  function deleteRow(ri) {
+    if (rows.length <= 1) return;
+    const tr = tableBody.querySelector(`tr[data-row="${ri}"]`);
+    if (tr) {
+      tr.style.cssText = 'opacity:0; transform:translateY(-4px); transition:opacity 0.15s ease,transform 0.15s ease;';
+      setTimeout(() => {
+        rows.splice(ri, 1);
+        renderTableBody();
+        updatePreview();
+      }, 150);
+    }
+  }
+
+  // ── Markdown parser ────────────────────────────────────────────────────────
+  function parseMarkdownTable(raw) {
+    const lines = raw.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) throw new Error('Need at least a header and separator row.');
+
+    const parseCells = line => {
+      if (!line.startsWith('|') || !line.endsWith('|')) throw new Error('Each row must start and end with |');
+      return line.slice(1, -1).split('|').map(c => c.trim());
+    };
+
+    const isSep = line => /^\|[\s|:-]+\|$/.test(line);
+
+    // Find separator row index (usually 1)
+    let sepIdx = lines.findIndex(isSep);
+    if (sepIdx === -1) throw new Error('No separator row found (e.g. | --- | --- |).');
+    if (sepIdx === 0) throw new Error('Header row missing before separator.');
+
+    const parsedHeaders = parseCells(lines[0]);
+    const parsedRows    = lines.slice(sepIdx + 1).map((l, i) => {
+      const cells = parseCells(l);
+      if (cells.length !== parsedHeaders.length)
+        throw new Error(`Row ${i + 1} has ${cells.length} cells, expected ${parsedHeaders.length}.`);
+      return cells;
+    });
+
+    if (parsedRows.length === 0) throw new Error('No data rows found after separator.');
+    return { headers: parsedHeaders, rows: parsedRows };
+  }
+
+  function loadMarkdown() {
+    importError.textContent = '';
+    try {
+      const { headers: h, rows: r } = parseMarkdownTable(importTextarea.value);
+      const n = clamp(h.length, 1, 12);
+      colCount = n;
+      headers  = h.slice(0, n);
+      rows     = r.map(row => row.slice(0, n).concat(new Array(Math.max(0, n - row.length)).fill('')));
+      colCountInput.value = colCount;
+      fullRender();
+      // Collapse panel on success
+      importBody.classList.remove('open');
+      importToggle.classList.remove('open');
+      importToggle.setAttribute('aria-expanded', 'false');
+    } catch (e) {
+      importError.textContent = e.message;
+    }
+  }
+
+  // ── Events ─────────────────────────────────────────────────────────────────
+  importToggle.addEventListener('click', () => {
+    const open = importBody.classList.toggle('open');
+    importToggle.classList.toggle('open', open);
+    importToggle.setAttribute('aria-expanded', String(open));
+  });
+
+  loadBtn.addEventListener('click', loadMarkdown);
+
+  clearImportBtn.addEventListener('click', () => {
+    importTextarea.value = '';
+    importError.textContent = '';
+  });
+
+  colCountInput.addEventListener('change', () => {
+    setColCount(parseInt(colCountInput.value, 10) || 1);
+    colCountInput.value = colCount;
+  });
+
+  colCountInput.addEventListener('input', () => {
+    const v = parseInt(colCountInput.value, 10);
+    if (!isNaN(v)) { setColCount(v); colCountInput.value = colCount; }
+  });
+
+  addRowBtn.addEventListener('click', addRow);
+
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(getMarkdown()).then(() => {
+      copyBtn.textContent = 'Copied!';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.textContent = 'Copy Markdown';
+        copyBtn.classList.remove('copied');
+      }, 1500);
+    });
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  setColCount(colCount);
+</script>
+</body>
+</html>
