@@ -373,6 +373,12 @@ select:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   border-radius: var(--radius); padding: 8px;
 }
 .translate-output { font-family: var(--font-mono); font-size: 13px; white-space: pre-wrap; }
+
+.live-sync-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 400; color: var(--text); cursor: pointer;
+}
+.live-sync-row input { cursor: pointer; }
 .translate-note { font-size: 12px; color: var(--text-muted); }
 
 /* history entries */

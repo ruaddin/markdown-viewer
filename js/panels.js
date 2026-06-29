@@ -103,6 +103,7 @@
   var translateOut  = document.getElementById('translate-output');
   var translateStatus = document.getElementById('translate-status');
   var bergamotPopup = document.getElementById('bergamot-popup');
+  var liveSyncCheckbox = document.getElementById('live-sync-checkbox');
 
   var lastDetectedSource = null;
   var translatorCache = {};        // "src>tgt" -> translator instance (Chrome API)
@@ -136,6 +137,16 @@
     var p = total ? (loaded / total) : loaded;
     if (p <= 1) p *= 100;
     return Math.round(p);
+  }
+
+  // Translate line-by-line so the original line-break structure survives the
+  // round trip (translation APIs collapse newlines when given the whole blob).
+  // Empty/whitespace-only lines pass through untouched and keep their position.
+  function translateByLine(text, translateOne) {
+    var lines = text.split('\n');
+    return Promise.all(lines.map(function (line) {
+      return line.trim() ? translateOne(line) : Promise.resolve(line);
+    })).then(function (parts) { return parts.join('\n'); });
   }
 
   function detectSource(text) {
@@ -189,7 +200,8 @@
       if (src === tgt) { translateOut.textContent = text; status('Source already in target language.'); return text; }
       return getTranslator(src, tgt).then(function (tr) {
         if (!tr) return null;
-        return tr.translate(text).then(function (out) { translateOut.textContent = out; status(''); return out; });
+        return translateByLine(text, function (line) { return tr.translate(line); })
+          .then(function (out) { translateOut.textContent = out; status(''); return out; });
       });
     }).catch(function (err) { status('Translation failed: ' + err.message); return null; });
   }
@@ -205,7 +217,7 @@
       if (src === tgt) { translateOut.textContent = text; status('Source already in target language.'); return text; }
       status('Downloading model…');
       return MDV.bergamot.ensureModels(src, tgt, function (p) { showProgress(p); })
-        .then(function () { hideProgress(); setPack(tgt, 'done'); status('Translating…'); return MDV.bergamot.translate(src, tgt, text); })
+        .then(function () { hideProgress(); setPack(tgt, 'done'); status('Translating…'); return translateByLine(text, function (line) { return MDV.bergamot.translate(src, tgt, line); }); })
         .then(function (out) { translateOut.textContent = out; status(''); return out; });
     }).catch(function (err) { hideProgress(); status('Bergamot failed: ' + err.message); return null; });
   }
@@ -219,6 +231,28 @@
     return Promise.resolve(null);
   }
   MDV.translateText = translateText;
+
+  // ── Live sync (translate while typing) ───────────────────────────────────────
+  // Always re-translates the full document, ignoring any selection. Debounced so
+  // a burst of keystrokes triggers a single run. State persists across reloads.
+  var liveTimer = null;
+  function maybeLiveTranslate() {
+    if (!liveSyncCheckbox.checked) return;
+    if (!translationMode) {
+      // Init the Chrome API silently. Don't surface the Bergamot popup here —
+      // that would fire on every keystroke; the user opts into Bergamot via the
+      // sidebar. So live sync is a no-op on non-Chrome until that choice is made.
+      if (apiAvailable()) { translationMode = 'chrome'; refreshTranslateEnabled(); }
+      else return;
+    }
+    translateText(editor.value);
+  }
+  function scheduleLiveTranslate() {
+    if (!liveSyncCheckbox.checked) return;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(maybeLiveTranslate, 700);
+  }
+  editor.addEventListener('input', scheduleLiveTranslate);
 
   // Called when the sidebar (or context-menu) first needs the API; shows the
   // fallback popup once if unavailable.
@@ -294,6 +328,13 @@
       var sel = editor.selectionStart !== editor.selectionEnd
         ? editor.value.slice(editor.selectionStart, editor.selectionEnd) : editor.value;
       translateText(sel);
+    });
+
+    // Live sync: restore persisted state, then translate on toggle-on.
+    liveSyncCheckbox.checked = MDV.lsGet(MDV.K.liveSync) === '1';
+    liveSyncCheckbox.addEventListener('change', function () {
+      MDV.lsSet(MDV.K.liveSync, liveSyncCheckbox.checked ? '1' : '0');
+      if (liveSyncCheckbox.checked) { ensureApiOrFallback(); maybeLiveTranslate(); }
     });
 
     // Bergamot fallback popup actions

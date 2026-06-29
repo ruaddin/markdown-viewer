@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.0
+
+- Translation now preserves the source's line breaks: text is translated
+  line-by-line and rejoined, so the output keeps its structure and stays readable.
+- New "Live sync" checkbox in the translation sidebar — when on, the full
+  document is re-translated automatically as you type. State persists across reloads.
+
 ## v1.1.0
 
 - Offline translation: non-Chrome browsers now translate via the bundled Bergamot

@@ -86,12 +86,14 @@ Top to bottom:
 
 1. **Source language display** — read-only, shows the auto-detected language of the current text (updated after each translation run).
 2. **Target language selector** — dropdown, default `English`. Not persisted to `localStorage`; resets to English on page load.
-3. **Translate button** — manual trigger (not live). Disabled until the language pack for the selected target is fully downloaded and ready.
+3. **Translate button** — manual trigger. Disabled until the language pack for the selected target is fully downloaded and ready.
+   - **Live sync checkbox** (below the button): when checked, the **full document** is re-translated automatically on input (debounced ~700ms), ignoring any selection. Unchecked, translation is manual-only via the button. State **is persisted** to `localStorage` (`mdviewer:liveSync`) and restored on load — note this differs from the target language, which is intentionally not persisted.
 4. **Language pack download progress bar** — shown only while a pack is actively downloading or was mid-download on a previous session (see Pack download & persistence). Hidden once the pack for the current target language is complete.
 5. **Translation output area** — displays the translated Markdown source text. Read-only. Scrollable independently.
 
 ### Translation scope and trigger
 
+- **Line-break preservation:** text is translated **line-by-line** (split on `\n`, non-empty lines translated, blank lines preserved in place, rejoined with `\n`) rather than as one blob. Translation APIs collapse newlines when given the whole text; per-line translation keeps the Markdown structure (each heading, list item, etc. on its own line) so the output stays readable. Applies to both the sidebar output and the popover.
 - **Default (no selection):** clicking Translate sends the full textarea content to the API.
 - **With selection:** if the user has text selected in the textarea when they click Translate, only the selected text is translated. The output area still receives the result.
 - **Right-click context menu on selected text:** selecting text in the textarea and right-clicking opens a custom context menu. "Translate" is one item in this menu. This menu is designed to be extensible for future functions. Choosing "Translate" from the menu:
@@ -124,9 +126,10 @@ If the Translation API is unavailable on page load, a non-blocking popup appears
 ### What this feature does NOT do
 
 - Translated output is not wired to the Download or Copy buttons — it is view-only in the sidebar/popover.
-- No live / auto-translate on typing.
 - No server-side component — all translation is in-browser.
 - Target language choice is not saved between sessions.
+
+> ⚠️ **Updated:** live / auto-translate on typing is now supported, opt-in via the Live sync checkbox (see Sidebar layout and controls). It is off by default.
 
 ---
 

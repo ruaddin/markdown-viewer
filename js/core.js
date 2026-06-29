@@ -30,7 +30,8 @@
     theme: 'theme',
     fontSize: 'fontSize',
     history: 'mdviewer:history',
-    packPrefix: 'translation_pack_'
+    packPrefix: 'translation_pack_',
+    liveSync: 'mdviewer:liveSync'
   };
 
   // ── Small utilities ───────────────────────────────────────────────────────

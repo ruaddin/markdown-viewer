@@ -48,7 +48,7 @@
   <div class="toolbar-group">
     <span class="howto-wrap">
       <button id="howto-btn" class="icon-btn" type="button" aria-label="How to use and changelogs" aria-haspopup="true" aria-expanded="false">?</button>
-      <span class="version-label">v1.1.0</span>
+      <span class="version-label">v1.2.0</span>
     </span>
     <button id="translate-toggle" class="icon-btn" type="button" aria-label="Translate" aria-pressed="false">&#127760;</button>
     <button id="history-toggle" class="icon-btn" type="button" aria-label="Document history" aria-pressed="false">&#128338;</button>
@@ -99,6 +99,11 @@
       </div>
 
       <button id="translate-run" class="btn-accent" type="button" disabled>Translate</button>
+
+      <label class="live-sync-row">
+        <input type="checkbox" id="live-sync-checkbox" />
+        Live sync (translate while typing)
+      </label>
 
       <div class="progress" id="pack-progress" hidden><span></span></div>
       <div class="translate-note" id="translate-status"></div>
