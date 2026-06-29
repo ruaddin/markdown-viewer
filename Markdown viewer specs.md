@@ -86,14 +86,12 @@ Top to bottom:
 
 1. **Source language display** — read-only, shows the auto-detected language of the current text (updated after each translation run).
 2. **Target language selector** — dropdown, default `English`. Not persisted to `localStorage`; resets to English on page load.
-3. **Translate button** — manual trigger. Disabled until the language pack for the selected target is fully downloaded and ready.
-   - **Live sync checkbox** (below the button): when checked, the **full document** is re-translated automatically on input (debounced ~700ms), ignoring any selection. Unchecked, translation is manual-only via the button. State **is persisted** to `localStorage` (`mdviewer:liveSync`) and restored on load — note this differs from the target language, which is intentionally not persisted.
+3. **Translate button** — manual trigger (not live). Disabled until the language pack for the selected target is fully downloaded and ready.
 4. **Language pack download progress bar** — shown only while a pack is actively downloading or was mid-download on a previous session (see Pack download & persistence). Hidden once the pack for the current target language is complete.
 5. **Translation output area** — displays the translated Markdown source text. Read-only. Scrollable independently.
 
 ### Translation scope and trigger
 
-- **Line-break preservation:** text is translated **line-by-line** (split on `\n`, non-empty lines translated, blank lines preserved in place, rejoined with `\n`) rather than as one blob. Translation APIs collapse newlines when given the whole text; per-line translation keeps the Markdown structure (each heading, list item, etc. on its own line) so the output stays readable. Applies to both the sidebar output and the popover.
 - **Default (no selection):** clicking Translate sends the full textarea content to the API.
 - **With selection:** if the user has text selected in the textarea when they click Translate, only the selected text is translated. The output area still receives the result.
 - **Right-click context menu on selected text:** selecting text in the textarea and right-clicking opens a custom context menu. "Translate" is one item in this menu. This menu is designed to be extensible for future functions. Choosing "Translate" from the menu:
@@ -126,10 +124,9 @@ If the Translation API is unavailable on page load, a non-blocking popup appears
 ### What this feature does NOT do
 
 - Translated output is not wired to the Download or Copy buttons — it is view-only in the sidebar/popover.
+- No live / auto-translate on typing.
 - No server-side component — all translation is in-browser.
 - Target language choice is not saved between sessions.
-
-> ⚠️ **Updated:** live / auto-translate on typing is now supported, opt-in via the Live sync checkbox (see Sidebar layout and controls). It is off by default.
 
 ---
 
@@ -210,9 +207,6 @@ A custom context menu replaces the browser default when the user right-clicks in
 | *(separator)* | | |
 | **Translate** | Always | Translates selection (or full doc if no selection); result shown in inline popover + sidebar. See Translation Tool section. |
 | *(separator)* | | |
-| **Bullet** | Text is selected | Applies `- ` prefix to each non-empty line in selection; removes prefix if all lines are already bulleted; converts from numbered if lines are numbered. See Bulleting / Numbering section. |
-| **Number** | Text is selected | Applies sequential `1.` `2.` … prefix to each non-empty line; removes prefix if all lines are already numbered; converts from bullet if lines are bulleted. |
-| *(separator)* | | |
 | **Edit Table** | Cursor / selection overlaps an existing Markdown table | Opens the table modal pre-loaded with that table |
 | **Insert Table** | Cursor / selection does not overlap any table | Opens the table modal with a blank table |
 | *(both "Edit Table" and "Insert Table")* | Selection spans table and non-table content | Both items appear; "Edit Table" targets the table containing the majority of selected content; tie broken by document order (first table wins) |
@@ -279,191 +273,10 @@ Selecting text in the preview scrolls the editor to the corresponding line. This
 
 ---
 
-## Toolbar Reorganisation ⚠️ NEW ADDITION — future implementors take note
-
-> Decisions settled in grilling session 2026-06-26. This section supersedes the toolbar references scattered across the Layout, Input, and Output sections.
-
-### Layout
-
-```
-[ Outline ] [ Bullet/# ] [ Table ] [ Import/Export ] [ Clear ] [ Font ]   ·····   <Filename (centre)>   ·····   [ How to / v1.0.0 ] [ Translate ] [ History ]
-```
-
-| Position | Control | Notes |
-|----------|---------|-------|
-| Far left 1 | **Document Outline** | Dropdown panel |
-| Far left 2 | **Bulleting / Numbering** | Dropdown panel |
-| Far left 3 | **Add Table** | Opens table modal directly (no dropdown) |
-| Far left 4 | **Import / Export** | Dropdown panel |
-| Far left 5 | **Clear** | Immediate action button (see Clear Button section) |
-| Far left 6 | **Font Resizer** | Dropdown panel (see Font Resizer & Theme Toggle section) |
-| **Centre** | **Filename field** | Always visible; editable inline text field |
-| Far right 1 | **How to Use / Changelogs** | Dropdown panel; version label shown below this button |
-| Far right 2 | **Translation** | Sidebar toggle (see Translation Tool section) |
-| Far right 3 | **History** | Sidebar toggle |
-
-All icon-only controls require `aria-label`. All sidebars (Translation, History) compress the existing panes when open — they do not overlay. All dropdown panels close on click-outside and on Esc.
-
----
-
-## Document Outline ⚠️ NEW ADDITION — future implementors take note
-
-> Decisions settled in grilling session 2026-06-26.
-
-### Toolbar control
-
-Icon-only button, far left position 1. `aria-label="Document outline"`. Opens a dropdown panel directly below.
-
-### Panel contents
-
-- Lists all headings (h1–h6) found in the textarea, in document order.
-- Each entry is indented proportionally to heading level: h1 = 0 indent, h2 = 1 level, h3 = 2 levels, and so on.
-- Each entry is a clickable item showing the heading text.
-
-### Update strategy (recommended)
-
-Parse the textarea for ATX headings (`# …`) each time the dropdown is **opened**, not continuously while the user types. The outline is hidden during typing so live-parsing buys nothing; re-parsing on open is accurate, instant even on large documents, and adds zero overhead during editing. No dirty-flag or debounce mechanism is needed.
-
-### Interaction
-
-- Clicking a heading item: scrolls both the textarea and the preview to that heading's position (dual-scroll, same mechanism as the Bidirectional Selection Highlight feature), then closes the dropdown.
-- The dropdown also closes on click-outside.
-
----
-
-## Bulleting / Numbering ⚠️ NEW ADDITION — future implementors take note
-
-> Decisions settled in grilling session 2026-06-26.
-
-### Toolbar control
-
-Icon-only button, far left position 2. `aria-label="Bullet or number list"`. Opens a dropdown with two items: **Bullet** and **Number**.
-
-### Behaviour
-
-Scope is the current textarea selection. Line breaks determine list elements — each non-empty line in the selection becomes one list item.
-
-| Action | Condition | Result |
-|--------|-----------|--------|
-| Click **Bullet** | Lines have no list prefix | Prepends `- ` to each non-empty line |
-| Click **Bullet** | All lines already have `- ` prefix | Removes `- ` prefix (de-bullets) |
-| Click **Bullet** | Lines have numbered prefix | Replaces `1.` `2.` … with `- ` (converts type) |
-| Click **Number** | Lines have no list prefix | Prepends `1.` `2.` `3.` … sequentially to each non-empty line |
-| Click **Number** | All lines already numbered | Removes numbered prefix (de-numbers) |
-| Click **Number** | Lines have `- ` prefix | Replaces `- ` with `1.` `2.` … (converts type) |
-
-- Empty lines within the selection are preserved as-is and do not increment the numbering counter.
-- The action is pushed onto the custom undo stack.
-
-### Right-click context menu
-
-"Bullet" and "Number" appear in the extensible right-click context menu (see Right-click Context Menu section, already updated). Behaviour is identical to the toolbar dropdown.
-
----
-
-## Import / Export Panel ⚠️ NEW ADDITION — future implementors take note
-
-> Decisions settled in grilling session 2026-06-26. Supersedes the Output section and the file-input parts of the Input section.
-
-### Toolbar control
-
-Button labelled **"Import / Export"** (or icon with that `aria-label`), far left position 4. Opens a dropdown panel directly below.
-
-### Panel contents (in order)
-
-| Item | Behaviour |
-|------|-----------|
-| **Import file** button | Opens `<input type="file" accept=".md">` picker. Loading a file sets the filename field and clears the undo stack. |
-| **Drop zone** | A visible drop target within the panel for `.md` files. Full-page drag-and-drop remains active alongside this as a convenience (see Layout section). Both are always present. |
-| **Copy** | Copies raw Markdown source to clipboard via Clipboard API. Button label flips to "Copied!" briefly as confirmation. |
-| **Download** | Saves raw Markdown as a `.md` file using the current filename. Blob + object URL, revoked after use. |
-
-### Filename field (toolbar centre)
-
-Always visible as an inline editable `<input>` in the centre of the toolbar.
-
-| State | Displayed value |
-|-------|----------------|
-| File imported | The imported filename (e.g. `notes.md`) |
-| New document, no explicit name set | First 5 words of textarea content joined by hyphens + `.md`, updated live as the user types |
-| New document, textarea empty | `untitled.md` |
-| After Clear | `untitled.md` (editor is empty; auto-derive has no words to pull) |
-| User types into the field | Custom name locked in; auto-derive suspended until next Clear or file import |
-
-- Persisted to `localStorage` (existing behaviour retained).
-- Used by the Download action.
-
----
-
-## How to Use / Changelogs ⚠️ NEW ADDITION — future implementors take note
-
-> Decisions settled in grilling session 2026-06-26.
-
-### Toolbar control
-
-Icon-only button, far right position 1. `aria-label="How to use and changelogs"`. Opens a dropdown panel directly below.
-
-A **static version label** (e.g. `v1.0.0`) is rendered as small text in the toolbar directly below this button. Hardcoded in the HTML; updated manually with each release.
-
-### Dropdown panel contents
-
-Two collapsible accordion sections — opening one closes the other.
-
-**"How to Use"**
-- Built-in, inlined directly in the HTML source. Not fetched.
-- Rendered as rich content (images, structured steps). Implementor may use static HTML or the existing marked.js stack — whichever renders the instructional content most cleanly.
-- Updated by editing the HTML source directly.
-
-**"Changelogs"**
-- Fetched at runtime from `changelog.md` located in the same directory as `index.html`.
-- Rendered using the existing marked.js stack (simple text; no LaTeX needed).
-- On fetch failure: shows inline fallback message "Changelog unavailable."
-- `file://` fallback not required — this tool is served exclusively from GitHub Pages.
-
----
-
-## History Sidebar ⚠️ NEW ADDITION — future implementors take note
-
-> Decisions settled in grilling session 2026-06-26.
-
-### Toolbar control
-
-Icon-only button, far right position 3. `aria-label="Document history"`. Toggles the History sidebar open/closed. Opening compresses the existing panes (same pattern as the Translation sidebar). Has its own drag handle for width resizing.
-
-### What counts as a history entry
-
-- A history entry is saved each time the **Clear** button is triggered — it captures the textarea content and filename at that moment.
-- The **current in-progress document** (whatever is live in the editor right now) is displayed at the top of the panel as a distinct "live" entry. It is not counted against the 10-entry limit and is not stored separately — it reads directly from the editor's live state.
-- When saved entries exceed 10, the oldest is dropped automatically.
-- All entries stored in `localStorage`.
-
-### Entry format
-
-```
-DD/MM/YYYY HH:MM  |  <filename or first 5 words of content>        [↺ Reload]
-```
-
-- Filename used if one was set at time of Clear; otherwise first 5 words of content.
-- Timestamp is the moment the Clear was triggered.
-
-### Per-entry actions
-
-| Action | Behaviour |
-|--------|-----------|
-| **Reload** (inline button on each row) | Pushes current editor state onto the undo stack, then replaces editor content and filename with that entry's saved values. |
-| **Delete** (per entry) | Removes that entry from history. Irreversible (no undo for history deletion). |
-| **Download** (per entry) | Saves that entry's raw content as a `.md` file using its stored filename. |
-
-### Sidebar-level action
-
-A **"Clear all history"** button at the bottom of the panel removes all 10 saved entries. The live current-document entry at the top is unaffected. Irreversible.
-
----
-
 ## Explicitly out of scope
 
 - No export to rendered HTML/PDF (browser print-to-PDF covers this if ever needed).
-- No toolbar formatting buttons for inline styles (bold/italic/etc.) or keyboard-shortcut formatting. Bulleting and numbering are in scope (see Bulleting / Numbering section); inline emphasis is not.
+- No toolbar formatting buttons (bold/italic/etc.) or keyboard-shortcut formatting.
 - No HTML sanitization of rendered Markdown (single-user, trusted personal-content tool).
 - No scroll-sync on cursor movement (clicks/arrow keys) — only on typing, by design, so both panes can be viewed/scrolled independently otherwise.
 
@@ -475,3 +288,4 @@ A **"Clear all history"** button at the bottom of the panel removes all 10 saved
 - `aria-label` on any icon-only controls.
 - Keyboard-reachable primary actions; visible focus outlines preserved.
 - Text contrast ≥ 4.5:1 in both light and dark themes.
+
